@@ -26,7 +26,6 @@ class OpenAIRunner(Generator, Transformer):
         user_prompt = self._build_user_prompt(lean_prompt, target_prefix)
         request_kwargs: dict[str, Any] = {
             "input": self._build_messages(user_prompt),
-            "response_format": self._response_format(),
             "max_output_tokens": self.max_output_tokens,
             "model": self.model,
             "timeout": self.timeout,
@@ -55,7 +54,7 @@ class OpenAIRunner(Generator, Transformer):
             print("Consider reducing the number of parallel processes.")
             return OpenAIRunner.generate(self, input, target_prefix)
         except Exception as e:
-            print(f"Failed to run the model for {prompt}!")
+            print(f"Failed to run the model for prompt: {user_prompt[:200]}...")
             print("Exception: ", repr(e))
             raise e
 
@@ -102,41 +101,6 @@ class OpenAIRunner(Generator, Transformer):
             f"{prefix_clause}\n"
             "Avoid using `aesop` and never reference the theorem name directly."
         )
-
-    def _response_format(self) -> dict[str, Any]:
-        return {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "lean_tactic_suggestions",
-                "schema": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "suggestions": {
-                            "type": "array",
-                            "minItems": self.num_suggestions,
-                            "maxItems": self.num_suggestions,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "tactic": {
-                                        "type": "string",
-                                        "description": "Single Lean tactic line.",
-                                    },
-                                    "explanation": {
-                                        "type": "string",
-                                        "description": "Short rationale for why the tactic should work.",
-                                    },
-                                },
-                                "required": ["tactic", "explanation"],
-                            },
-                        }
-                    },
-                    "required": ["suggestions"],
-                },
-            },
-        }
 
     def _extract_suggestions(self, response) -> list[dict[str, str]]:
         text_chunks: list[str] = []
