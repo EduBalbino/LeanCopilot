@@ -67,8 +67,8 @@ def hint (stx : Syntax) (tacStrs : Array (String × Option String)) (check : Boo
       | Except.ok stx => return some (tstr, stx, explanation?)
     let tacs := Nondet.ofList tacStxs.toList
     let results := tacs.filterMapM fun t : (String × Syntax × Option String) => do
-      if let some msgs ← observing? (withMessageLog (withoutInfoTrees (evalTactic t.2))) then
-        return some (← getGoals, ← suggestion t.1 msgs t.3)
+      if let some msgs ← observing? (withMessageLog (withoutInfoTrees (evalTactic t.2.1))) then
+        return some (← getGoals, ← suggestion t.1 msgs t.2.2)
       else
         return none
     let results ← (results.toMLList.takeUpToFirst fun r => r.1.1.isEmpty).asArray

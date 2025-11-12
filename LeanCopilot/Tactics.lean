@@ -23,12 +23,12 @@ structure StructuredSuggestion where
 deriving Inhabited, FromJson
 
 private def decodeStructuredSuggestion? (raw : String) : Option (String × Option String) := do
-  match Json.parse? raw with
+  match Json.parse raw with
   | Except.error _ => none
   | Except.ok json =>
       match fromJson? json with
       | Except.error _ => none
-      | Except.ok info =>
+      | Except.ok (info : StructuredSuggestion) =>
           let tactic := info.tactic.trim
           if tactic.isEmpty then
             none
@@ -121,30 +121,12 @@ private def annotatePremise (pi : PremiseInfo) : MetaM String := do
   catch _ => return s!"{pi.name} needs to be imported from `{pi.path}`.\n```code\n{pi.code}\n```\n"
 
 
-/--
-Retrieve a list of premises given a query.
--/
-def retrieve (input : String) : TacticM (Array PremiseInfo) := do
-  if ¬ (← premiseEmbeddingsInitialized) ∧ ¬ (← initPremiseEmbeddings .auto) then
-    throwError "Cannot initialize premise embeddings"
-
-  if ¬ (← premiseDictionaryInitialized) ∧ ¬ (← initPremiseDictionary) then
-    throwError "Cannot initialize premise dictionary"
-
-  let k ← SelectPremises.getNumPremises
-  let query ← encode Builtin.encoder input
-
-  let rawPremiseInfo := FFI.retrieve query k.toUInt64
-  let premiseInfo : Array PremiseInfo := rawPremiseInfo.map fun (name, path, code, score) =>
-    { name := name, path := path, code := code, score := score }
-  return premiseInfo
+def retrieve (_input : String) : TacticM (Array PremiseInfo) := do
+  throwError "Premise selection is not supported in this build."
 
 
-/--
-Retrieve a list of premises using the current pretty-printed tactic state as the query.
--/
 def selectPremises : TacticM (Array PremiseInfo) := do
-  retrieve (← getPpTacticState)
+  retrieve ""
 
 
 syntax "pp_state" : tactic
@@ -163,7 +145,11 @@ elab_rules : tactic
     logInfo state
 
   | `(tactic | suggest_tactics%$tac $pfx:str) => do
+    let generatorName ← SuggestTactics.getGeneratorName
+    logInfoAt tac m!"Lean Copilot ({generatorName}) is thinking..."
     let (tacticsWithScores, elapsed) ← Aesop.time $ suggestTacticsWithMetadata pfx.getString
+    logInfoAt tac
+      m!"Lean Copilot finished in {elapsed.printAsMillis} and produced {tacticsWithScores.size} tactics."
     if ← isVerbose then
       logInfo s!"{elapsed.printAsMillis} for generating {tacticsWithScores.size} tactics"
     let tactics := tacticsWithScores.map (fun (t, _, _) => t)
@@ -175,11 +161,7 @@ elab_rules : tactic
     hint ref tacticAndExplanation (← SuggestTactics.checkTactics)
 
   | `(tactic | select_premises) => do
-    let premisesWithInfoAndScores ← selectPremises
-    let rankedPremisesWithInfoAndScores := premisesWithInfoAndScores.qsort (·.score > ·.score)
-    let richPremises ← Meta.liftMetaM $ (rankedPremisesWithInfoAndScores.mapM annotatePremise)
-    let richPremisesExpand := richPremises.foldl (init := "") (· ++ · ++ "\n")
-    logInfo richPremisesExpand
+    throwError "Premise selection is not supported in this build."
 
 
 end LeanCopilot

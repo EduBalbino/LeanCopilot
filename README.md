@@ -101,12 +101,6 @@ The tactic `search_proof` combines LLM-generated tactics with [aesop](https://gi
 
 <img width="824" alt="search_proof" src="https://github.com/lean-dojo/LeanCopilot/assets/114432581/26381fca-da4e-43d9-84b5-7e27b0612626">
 
-#### Premise Selection
-
-The `select_premises` tactic retrieves a list of potentially useful premises. Currently, it uses the retriever in [LeanDojo](https://leandojo.org/) to select premises from a fixed snapshot of Lean and [mathlib4](https://github.com/leanprover-community/mathlib4/tree/3ce43c18f614b76e161f911b75a3e1ef641620ff).
-
-![select_premises](https://github.com/lean-dojo/LeanCopilot/assets/114432581/2817663c-ba98-4a47-9ae9-5b8680b6265a)
-
 #### Running LLMs
 
 You can also run the inference of any LLMs in Lean, which can be used to build customized proof automation or other LLM-based applications (not limited to theorem proving). It's possible to run arbitrary models either locally or remotely (see [Bring Your Own Model](#bring-your-own-model)).
@@ -115,13 +109,12 @@ You can also run the inference of any LLMs in Lean, which can be used to build c
 
 ## Advanced Usage
 
-**This section is only for advanced users who would like to change the default behavior of `suggest_tactics`, `search_proof`, or `select_premises`, e.g., to use different models or hyperparameters.**
+**This section is only for advanced users who would like to change the default behavior of `suggest_tactics` or `search_proof`, e.g., to use different models or hyperparameters.**
 
 ### Tactic APIs
 
 * Examples in [TacticSuggestion.lean](LeanCopilotTests/TacticSuggestion.lean) showcase how to configure `suggest_tactics`, e.g., to use different models or generate different numbers of tactics.
 * Examples in [ProofSearch.lean](LeanCopilotTests/ProofSearch.lean) showcase how to configure `search_proof` using options provided by [aesop](https://github.com/leanprover-community/aesop).
-* Examples in [PremiseSelection.lean](LeanCopilotTests/PremiseSelection.lean) showcase how to set the number of retrieved premises for `select_premises`.
 
 ### Model APIs
 
@@ -138,9 +131,8 @@ class TextToText (τ : Type) where
 * `targetPrefix` is used to constrain the generator's output. `""` means no constraint.
 * `generate` should return an array of `String × Float`. Each `String` is an output from the model, and `Float` is the corresponding score.
 
-We provide three types of Generators:
+We provide two types of Generators:
 
-* [`NativeGenerator`](LeanCopilot/Models/Native.lean) runs locally powered by [CTranslate2](https://github.com/OpenNMT/CTranslate2) and is linked to Lean using Foreign Function Interface (FFI).
 * [`ExternalGenerator`](LeanCopilot/Models/External.lean) is hosted either locally or remotely. See [Bring Your Own Model](#bring-your-own-model) for details.
 * [`GenericGenerator`](LeanCopilot/Models/Generic.lean) can be anything that implements the `generate` function in the `TextToText` typeclass.
 
@@ -154,20 +146,13 @@ class TextToVec (τ : Type) where
 * `input` is the input string
 * `encode` should return a vector embedding produced by the model.
 
-Similar to generators, we have `NativeEncoder`, `ExternalEncoder`, and `GenericEncoder`.
+Similar to generators, we have `ExternalEncoder` and `GenericEncoder`.
 
 ### Bring Your Own Model
 
 In principle, it is possible to run any model using Lean Copilot through `ExternalGenerator` or `ExternalEncoder` (examples in [ModelAPIs.lean](LeanCopilotTests/ModelAPIs.lean)). To use a model, you need to wrap it properly to expose the APIs in [external_model_api.yaml](./external_model_api.yaml). As an example, we provide a [Python API server](./python) and use it to run a few models.
 
 ## Caveats
-
-* `select_premises` always retrieves the original form of a premise. For example, `Nat.add_left_comm` is a result of the theorem below. In this case, `select_premises` retrieves `Nat.mul_left_comm` instead of `Nat.add_left_comm`.
-
-```lean
-@[to_additive]
-theorem mul_left_comm : ∀ a b c : G, a * (b * c) = b * (a * c)
-```
 
 * In some cases, `search_proof` produces an erroneous proof with error messages like `fail to show termination for ...`. A temporary workaround is changing the theorem's name before applying `search_proof`. You can change it back after `search_proof` completes.
 

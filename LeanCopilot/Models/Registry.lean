@@ -1,10 +1,8 @@
 import Lean
 import Batteries.Data.HashMap
-import LeanCopilot.Models.Native
 import LeanCopilot.Models.External
 import LeanCopilot.Models.Generic
 import LeanCopilot.Models.Builtin
-import LeanCopilot.Models.FFI
 
 set_option autoImplicit false
 
@@ -14,7 +12,6 @@ namespace LeanCopilot
 
 
 inductive Generator where
-  | native : NativeGenerator → Generator
   | external : ExternalGenerator → Generator
   | generic : GenericGenerator → Generator
 
@@ -22,13 +19,11 @@ inductive Generator where
 instance : TextToText Generator where
   generate (model : Generator) (input : String) (targetPrefix : String) :=
     match model with
-    | .native ng => ng.generate input targetPrefix
     | .external eg => eg.generate input targetPrefix
     | .generic gg => gg.generate input targetPrefix
 
 
 inductive Encoder where
-  | native : NativeEncoder → Encoder
   | external : ExternalEncoder → Encoder
   | generic : GenericEncoder → Encoder
 
@@ -36,7 +31,6 @@ inductive Encoder where
 instance : TextToVec Encoder where
   encode (model : Encoder) (input : String) :=
     match model with
-    | .native ne => ne.encode input
     | .external ee => ee.encode input
     | .generic ge => ge.encode input
 
@@ -47,9 +41,9 @@ instance {α β : Type} [BEq α] [Hashable α] [Repr α] [Repr β] : Repr (Std.H
 
 structure ModelRegistry where
   generators : Std.HashMap String Generator :=
-    Std.HashMap.ofList [(Builtin.generator.name, .native Builtin.generator)]
+    Std.HashMap.ofList [(Builtin.generator.name, .external Builtin.generator)]
   encoders : Std.HashMap String Encoder :=
-    Std.HashMap.ofList [(Builtin.encoder.name, .native Builtin.encoder)]
+    Std.HashMap.ofList [(Builtin.encoder.name, .external Builtin.encoder)]
 
 
 namespace ModelRegistry
@@ -87,10 +81,6 @@ def getModelRegistry : IO ModelRegistry := modelRegistryRef.get
 def getGenerator (name : String) : Lean.CoreM Generator := do
   let mr ← getModelRegistry
   match mr.generators[name]? with
-  | some (.native model) =>
-    if ¬(← isUpToDate model.url) then
-      Lean.logWarning s!"The local model {model.name} is not up to date. You may want to run `lake exe LeanCopilot/download` to re-download it."
-    return .native model
   | some descr => return descr
   | none => throwError s!"unknown generator: {name}"
 
