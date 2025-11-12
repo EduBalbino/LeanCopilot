@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import re
 from typing import List, Tuple
 from abc import ABC, abstractmethod
 
@@ -16,7 +17,10 @@ def pre_process_input(model_name, input):
             + "```\nPlease predict a possible tactic to help me prove the theorem."
         )
         prompt = f"""<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"""
-    elif model_name == "gpt-3.5-turbo" or model_name == "gpt-4-turbo-preview":
+    elif model_name in {
+        "gpt-5-mini",
+        "gpt-5-nano",
+    }:
         prompt = (
             "Here is a theorem you need to prove in Lean:\n"
             + input
@@ -33,26 +37,46 @@ def pre_process_input(model_name, input):
     return prompt
 
 
+def _first_non_empty_line(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def _extract_tactic(candidate: str) -> str:
+    matches = re.findall(r'"([^"]+)"', candidate)
+    if matches:
+        return matches[0].strip()
+    return candidate.strip()
+
+
 def post_process_output(model_name, output):
     if model_name == "internlm/internlm2-math-plus-1_8b":
         result = (
             output.split("assistant")[-1]
             .split("lean")[-1]
             .split("```")[0]
-            .split("\n")[1]
         )
+        result = _first_non_empty_line(result)
     elif model_name == "AI-MO/Kimina-Prover-Preview-Distill-7B":
         result = (
             output.split("assistant")[-1]
             .split("lean")[-1]
             .split("```")[0]
-            .split("\n")[-2]
-            .lstrip()
         )
-    elif model_name == "gpt-3.5-turbo" or model_name == "gpt-4-turbo-preview":
-        result = output.split("lean")[-1].split("```")[0].split("\n")[1]
+        lines = [line.strip() for line in result.splitlines() if line.strip()]
+        result = lines[-1] if lines else ""
+    elif model_name in {
+        "gpt-5-mini",
+        "gpt-5-nano",
+    }:
+        chunk = output.split("lean")[-1].split("```")[0]
+        result = _extract_tactic(_first_non_empty_line(chunk))
     elif "gemini" in model_name or "claude" in model_name:
-        result = output.split("lean")[-1].split("```")[0].split("\n")[1]
+        chunk = output.split("lean")[-1].split("```")[0]
+        result = _extract_tactic(_first_non_empty_line(chunk))
     else:
         raise NotImplementedError(f"External model '{model_name}' not supported")
     return result

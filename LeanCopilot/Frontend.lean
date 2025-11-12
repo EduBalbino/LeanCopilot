@@ -19,7 +19,8 @@ Construct a suggestion for a tactic.
 * Otherwise use the provided syntax.
 * Also, look for remaining goals and pretty print them after the suggestion.
 -/
-def suggestion (tac : String) (msgs : MessageLog := {}) : TacticM Suggestion := do
+def suggestion (tac : String) (msgs : MessageLog := {}) (explanation? : Option String := none) :
+    TacticM Suggestion := do
   -- TODO `addExactSuggestion` has an option to construct `postInfo?`
   -- Factor that out so we can use it here instead of copying and pasting?
   let goals ← getGoals
@@ -36,7 +37,8 @@ def suggestion (tac : String) (msgs : MessageLog := {}) : TacticM Suggestion := 
   let suggestion ← match msg? with
   | some m => pure <| SuggestionText.string (((← m.data.toString).drop 10).takeWhile (· != '\n'))
   | none => pure <| SuggestionText.string tac
-  return { suggestion, postInfo?, style? }
+  let explanationInfo? := explanation?.map fun e => s!"Explanation: {e}"
+  return { suggestion, preInfo? := explanationInfo?, postInfo?, style? }
 
 
 /-- Run a tactic, returning any new messages rather than adding them to the message log. -/
@@ -57,15 +59,16 @@ def withoutInfoTrees (t : TacticM Unit) : TacticM Unit := do
 
 
 open Lean.Meta.Tactic.TryThis in
-def hint (stx : Syntax) (tacStrs : Array String) (check : Bool) : TacticM Unit := do
+def hint (stx : Syntax) (tacStrs : Array (String × Option String)) (check : Bool) : TacticM Unit := do
   if check then
-    let tacStxs ← tacStrs.filterMapM fun tstr : String => do match runParserCategory (← getEnv) `tactic tstr with
+    let tacStxs ← tacStrs.filterMapM fun (tstr, explanation?) => do
+      match runParserCategory (← getEnv) `tactic tstr with
       | Except.error _ => return none
-      | Except.ok stx => return some (tstr, stx)
+      | Except.ok stx => return some (tstr, stx, explanation?)
     let tacs := Nondet.ofList tacStxs.toList
-    let results := tacs.filterMapM fun t : (String × Syntax) => do
+    let results := tacs.filterMapM fun t : (String × Syntax × Option String) => do
       if let some msgs ← observing? (withMessageLog (withoutInfoTrees (evalTactic t.2))) then
-        return some (← getGoals, ← suggestion t.1 msgs)
+        return some (← getGoals, ← suggestion t.1 msgs t.3)
       else
         return none
     let results ← (results.toMLList.takeUpToFirst fun r => r.1.1.isEmpty).asArray
@@ -76,5 +79,9 @@ def hint (stx : Syntax) (tacStrs : Array String) (check : Bool) : TacticM Unit :
       setMCtx r.2.term.meta.meta.mctx
     | none => admitGoal (← getMainGoal)
   else
-    let tacsNoCheck : Array Suggestion := tacStrs.map fun tac => { suggestion := SuggestionText.string tac }
+    let tacsNoCheck : Array Suggestion :=
+      tacStrs.map fun
+        | (tac, explanation?) =>
+            { suggestion := SuggestionText.string tac
+              preInfo? := explanation?.map fun e => s!"Explanation: {e}" }
     addSuggestions stx tacsNoCheck

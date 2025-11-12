@@ -1,4 +1,5 @@
 import Lean
+import Lean.Data.Json
 import LeanCopilot.Options
 import LeanCopilot.Frontend
 import Aesop.Util.Basic
@@ -12,6 +13,29 @@ set_option autoImplicit false
 
 
 namespace LeanCopilot
+
+/--
+Structured payload that can optionally attach a natural language justification to a tactic.
+-/
+structure StructuredSuggestion where
+  tactic : String
+  explanation : String
+deriving Inhabited, FromJson
+
+private def decodeStructuredSuggestion? (raw : String) : Option (String × Option String) := do
+  match Json.parse? raw with
+  | Except.error _ => none
+  | Except.ok json =>
+      match fromJson? json with
+      | Except.error _ => none
+      | Except.ok info =>
+          let tactic := info.tactic.trim
+          if tactic.isEmpty then
+            none
+          else
+            let explanation := info.explanation.trim
+            let explanation? := if explanation.isEmpty then none else some explanation
+            some (tactic, explanation?)
 
 /--
 Pretty-print a list of goals.
@@ -35,11 +59,16 @@ open SuggestTactics in
 /--
 Generate a list of tactic suggestions.
 -/
-def suggestTactics (targetPrefix : String) : TacticM (Array (String × Float)) := do
+def suggestTacticsWithMetadata (targetPrefix : String) :
+    TacticM (Array (String × Float × Option String)) := do
   let state ← getPpTacticState
   let nm ← getGeneratorName
   let model ← getGenerator nm
   let suggestions ← generate model state targetPrefix
+  let structured := suggestions.map fun (raw, score) =>
+    match decodeStructuredSuggestion? raw with
+    | some (tac, explanation?) => (tac, score, explanation?)
+    | none => (raw, score, none)
   -- A temporary workaround to prevent the tactic from using the current theorem.
   -- TODO: Use a more principled way, e.g., see `Lean4Repl.lean` in `LeanDojo`.
   if let some declName ← getDeclName? then
@@ -50,16 +79,22 @@ def suggestTactics (targetPrefix : String) : TacticM (Array (String × Float)) :
     if ← isVerbose then
       logInfo s!"State:\n{state}"
       logInfo s!"Theorem name:\n{theoremName}"
-    let filteredSuggestions := suggestions.filterMap fun ((t, s) : String × Float) =>
+    let filteredSuggestions := structured.filterMap fun (t, s, explanation?) =>
       let isAesop := t == "aesop"
       let isSelfReference := ¬ (theoremName == "") ∧ (theoremNameMatcher.find? t |>.isSome)
-      if isSelfReference ∨ isAesop then none else some (t, s)
+      if isSelfReference ∨ isAesop then none else some (t, s, explanation?)
     return filteredSuggestions
   else
-    let filteredSuggestions := suggestions.filterMap fun ((t, s) : String × Float) =>
+    let filteredSuggestions := structured.filterMap fun (t, s, explanation?) =>
       let isAesop := t == "aesop"
-      if isAesop then none else some (t, s)
+      if isAesop then none else some (t, s, explanation?)
     return filteredSuggestions
+
+/--
+Backward-compatible helper that omits explanation metadata.
+-/
+def suggestTactics (targetPrefix : String) : TacticM (Array (String × Float)) := do
+  return (← suggestTacticsWithMetadata targetPrefix).map fun (t, s, _) => (t, s)
 
 
 /--
@@ -128,15 +163,16 @@ elab_rules : tactic
     logInfo state
 
   | `(tactic | suggest_tactics%$tac $pfx:str) => do
-    let (tacticsWithScores, elapsed) ← Aesop.time $ suggestTactics pfx.getString
+    let (tacticsWithScores, elapsed) ← Aesop.time $ suggestTacticsWithMetadata pfx.getString
     if ← isVerbose then
       logInfo s!"{elapsed.printAsMillis} for generating {tacticsWithScores.size} tactics"
-    let tactics := tacticsWithScores.map (·.1)
+    let tactics := tacticsWithScores.map (fun (t, _, _) => t)
     if ← isVerbose then
       logInfo s!"Tactics: {tactics}"
     let range : String.Range := { start := tac.getRange?.get!.start, stop := pfx.raw.getRange?.get!.stop }
     let ref := Syntax.ofRange range
-    hint ref tactics (← SuggestTactics.checkTactics)
+    let tacticAndExplanation := tacticsWithScores.map fun (t, _, explanation?) => (t, explanation?)
+    hint ref tacticAndExplanation (← SuggestTactics.checkTactics)
 
   | `(tactic | select_premises) => do
     let premisesWithInfoAndScores ← selectPremises

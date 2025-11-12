@@ -11,7 +11,7 @@ The setup steps are pretty simple. The script below is sufficient to run all ext
 conda create --name lean-copilot python=3.10 python numpy
 conda activate lean-copilot
 pip install torch --index-url https://download.pytorch.org/whl/cu121  # Depending on whether you have CUDA and, if so, your CUDA version; see https://pytorch.org/.
-pip install fastapi uvicorn loguru transformers openai anthropic google.generativeai vllm
+pip install fastapi uvicorn loguru transformers openai google.generativeai vllm
 ```
 
 ## Running the Server
@@ -21,6 +21,8 @@ uvicorn server:app --port 23337
 ```
 
 After the server is up running, you can go to `LeanCopilotTests/ModelAPIs.lean` to try your external models out!
+
+> **Note:** The bundled FastAPI server currently exposes only the OpenAI GPT‑5 endpoints (`gpt-5-mini` and `gpt-5-nano`). Other runner types have been trimmed out to keep the lightweight setup dependency-free.
 
 ## Contributions
 

@@ -101,15 +101,26 @@ def reproverExternalEncoder : ExternalEncoder := {
 #eval encode reproverExternalEncoder "n : ℕ\n⊢ gcd n n = n"
 
 /--
-General-purpose LLM apis: openai, claude, etc.
+General-purpose LLM APIs (OpenAI). Only the latest GPT-5 endpoints are supported.
 -/
-def gpt4 : ExternalGenerator := {
-  name := "gpt4"
+def gpt5Mini : ExternalGenerator := {
+  name := "gpt-5-mini"
   host := "localhost"
   port := 23337
 }
 
-#eval generate gpt4 "n : ℕ\n⊢ gcd n n = n"
+#eval generate gpt5Mini "n : ℕ\n⊢ gcd n n = n"
+
+/--
+Smaller GPT-5 variant for cheaper experiments.
+-/
+def gpt5Nano : ExternalGenerator := {
+  name := "gpt-5-nano"
+  host := "localhost"
+  port := 23337
+}
+
+#eval generate gpt5Nano "n : ℕ\n⊢ gcd n n = n"
 
 /--
 Math LLMs: InternLM, Deepseekmath, etc.
