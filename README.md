@@ -148,6 +148,16 @@ class TextToVec (τ : Type) where
 
 Similar to generators, we have `ExternalEncoder` and `GenericEncoder`.
 
+## Vision: GPT-5 as the Tactic Copilot
+
+LeanCopilot is evolving into a lightweight bridge between Lean’s tactic state and the strongest available GPT-5 endpoints. Instead of juggling heavy native runtimes, we focus on this flow:
+
+- Capture the current Lean goal, serialize it, and send it to GPT-5 via the Responses API.
+- Enforce a strict JSON schema so the model returns `n` tactics, each with an explanation. No string hacks, no guessing logprobs.
+- Surface those tactics in the infoview with clear “thinking…” and completion messages, explanations inline, and the same click-to-apply UX Lean users rely on.
+
+This approach keeps the Lean package lean (no OpenBLAS/CTranslate2), makes the FastAPI side easy to extend, and ensures GPT-5 does the heavy reasoning. If you need another model, just register an external generator; the structured-output plumbing is already in place.
+
 ### Bring Your Own Model
 
 In principle, it is possible to run any model using Lean Copilot through `ExternalGenerator` or `ExternalEncoder` (examples in [ModelAPIs.lean](LeanCopilotTests/ModelAPIs.lean)). To use a model, you need to wrap it properly to expose the APIs in [external_model_api.yaml](./external_model_api.yaml). As an example, we provide a [Python API server](./python) and use it to run a few models.
