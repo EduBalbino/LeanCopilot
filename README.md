@@ -1,7 +1,7 @@
 Lean Copilot: LLMs as Copilots for Theorem Proving in Lean
 ==========================================================
 
-Lean Copilot allows large language models (LLMs) to be used natively in Lean for proof automation, e.g., suggesting tactics and searching for proofs. This release focuses exclusively on a single external generator powered by **GPT-5-mini**. All requests go through the provided Python server and every proof search issues **at most five completions** per call.
+Lean Copilot allows large language models (LLMs) to be used natively in Lean for proof automation, e.g., suggesting tactics and searching for proofs. This release focuses exclusively on a single external generator powered by **GPT-5-nano**. All requests go through the provided Python server and every proof search issues **at most five completions** per call.
 
 <https://github.com/lean-dojo/LeanCopilot/assets/114432581/ee0f56f8-849e-4099-9284-d8092cbd22a3>
 
@@ -15,7 +15,7 @@ Lean Copilot allows large language models (LLMs) to be used natively in Lean for
       1. [Proof Search](#proof-search)
 1. [Advanced Usage](#advanced-usage)
    1. [Tactic APIs](#tactic-apis)
-   1. [Configuring the GPT-5-mini Server](#configuring-the-gpt-5-mini-server)
+   1. [Configuring the GPT-5-nano Server](#configuring-the-gpt-5-nano-server)
 1. [Caveats](#caveats)
 1. [Getting in Touch](#getting-in-touch)
 1. [Acknowledgements](#acknowledgements)
@@ -25,7 +25,7 @@ Lean Copilot allows large language models (LLMs) to be used natively in Lean for
 
 * Supported platforms: Linux, macOS, Windows and [Windows WSL](https://learn.microsoft.com/en-us/windows/wsl/install).
 * Python 3.10+ with `fastapi`, `uvicorn`, `loguru`, and `openai`. (See `python/README.md`.)
-* An `OPENAI_API_KEY` that can access `gpt-5-mini`.
+* An `OPENAI_API_KEY` that can access `gpt-5-nano`.
 
 ## Using Lean Copilot in Your Project
 
@@ -52,7 +52,7 @@ rev = "LEAN_COPILOT_VERSION"
 
 3. Run `lake build`.
 
-4. Start the Python server in `python/server.py` (see [Configuring the GPT-5-mini Server](#configuring-the-gpt-5-mini-server)) and ensure it has access to your `OPENAI_API_KEY`.
+4. Start the Python server in `python/server.py` (see [Configuring the GPT-5-nano Server](#configuring-the-gpt-5-nano-server)) and ensure it has access to your `OPENAI_API_KEY`.
 
 [Here](https://github.com/yangky11/lean4-example/blob/LeanCopilot-demo) is an example of a Lean package depending on Lean Copilot. If you have problems building the project, our [Dockerfile](./Dockerfile), [build.sh](scripts/build.sh) or [build_example.sh](scripts/build_example.sh) may be helpful.
 
@@ -76,22 +76,22 @@ The tactic `search_proof` combines LLM-generated tactics with [aesop](https://gi
 
 #### Running LLMs
 
-LLM inference now goes through the bundled GPT-5-mini gateway. Use the scripts in [`python/`](./python) to point Lean Copilot at a different GPT-5-mini deployment if needed.
+LLM inference now goes through the bundled GPT-5-nano gateway. Use the scripts in [`python/`](./python) to point Lean Copilot at a different GPT-5-nano deployment if needed.
 
 <img width="1123" alt="run_llms" src="https://github.com/lean-dojo/LeanCopilot/assets/5431913/a4e5b84b-a797-4216-a416-2958448aeb07">
 
 ## Advanced Usage
 
-**This section is only for advanced users who would like to change the default behavior of `suggest_tactics` or `search_proof`, e.g., to point them at a different GPT-5-mini endpoint.**
+**This section is only for advanced users who would like to change the default behavior of `suggest_tactics` or `search_proof`, e.g., to point them at a different GPT-5-nano endpoint.**
 
 ### Tactic APIs
 
-* Examples in [TacticSuggestion.lean](LeanCopilotTests/TacticSuggestion.lean) showcase how to configure `suggest_tactics`, e.g., to switch between GPT-5-mini servers.
+* Examples in [TacticSuggestion.lean](LeanCopilotTests/TacticSuggestion.lean) showcase how to configure `suggest_tactics`, e.g., to switch between GPT-5-nano servers.
 * Examples in [ProofSearch.lean](LeanCopilotTests/ProofSearch.lean) showcase how to configure `search_proof` using options provided by [aesop](https://github.com/leanprover-community/aesop).
 
-### Configuring the GPT-5-mini Server
+### Configuring the GPT-5-nano Server
 
-**Examples in [ModelAPIs.lean](LeanCopilotTests/ModelAPIs.lean) showcase how to register additional GPT-5-mini endpoints or override the default host/port.**
+**Examples in [ModelAPIs.lean](LeanCopilotTests/ModelAPIs.lean) showcase how to register additional GPT-5-nano endpoints or override the default host/port.**
 
 Lean Copilot now treats `Generator` as an alias for [`ExternalGenerator`](LeanCopilot/Models/External.lean) and relies on the `TextToText` interface:
 
@@ -101,7 +101,7 @@ class TextToText (τ : Type) where
     IO $ Array (String × Float)
 ```
 
-Every request is forwarded to the Python server using the schema described in [external_model_api.yaml](./external_model_api.yaml). Our reference implementation lives in [`python/server.py`](./python/server.py), uses `OpenAIRunner`, and clamps `num_return_sequences` to **exactly five GPT-5-mini completions**.
+Every request is forwarded to the Python server using the schema described in [external_model_api.yaml](./external_model_api.yaml). Our reference implementation lives in [`python/server.py`](./python/server.py), uses `OpenAIRunner`, and clamps `num_return_sequences` to **exactly five GPT-5-nano completions**.
 
 To run the server:
 
@@ -120,11 +120,11 @@ Our primary verification plan is to exercise the tactic suggestions in `LeanCopi
 2. Run `lake build LeanCopilotTests` (or at least compile `LeanCopilotTests/TacticSuggestion.lean`). The Lean code will surface any API errors immediately.
 3. The Python server now enforces OpenAI Structured Outputs—any schema violation or refusal becomes an HTTP error. When that happens, inspect the server logs (e.g., `journalctl -u <your-service-name>`) to diagnose the failure.
 
-This tactic-focused test plan is sufficient for validating changes to the GPT-5-mini server.
+This tactic-focused test plan is sufficient for validating changes to the GPT-5-nano server.
 
 ## Caveats
 
-* The Python server enforces **exactly five** completions per request to GPT-5-mini. Increase the budget by scaling out servers rather than changing `num_return_sequences`.
+* The Python server enforces **exactly five** completions per request to GPT-5-nano. Increase the budget by scaling out servers rather than changing `num_return_sequences`.
 * In some cases, `search_proof` produces an erroneous proof with error messages like `fail to show termination for ...`. A temporary workaround is changing the theorem's name before applying `search_proof`. You can change it back after `search_proof` completes.
 
 ## Getting in Touch

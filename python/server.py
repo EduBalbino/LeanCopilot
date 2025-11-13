@@ -8,7 +8,7 @@ from external_models import OpenAIRunner
 from loguru import logger
 
 
-GPT5_MINI_MODEL_NAME = "gpt-5-mini"
+GPT5_MINI_MODEL_NAME = "gpt-5-nano"
 
 
 class GeneratorRequest(BaseModel):

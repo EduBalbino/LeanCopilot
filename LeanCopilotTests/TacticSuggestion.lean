@@ -35,7 +35,7 @@ example (a b c : Nat) : a + b + c = a + c + b := by
 
 
 /-
-### Configure Alternative GPT-5-mini Endpoints
+### Configure Alternative GPT-5-nano Endpoints
 -/
 
 def stagingGenerator : Generator :=
@@ -45,11 +45,11 @@ def stagingGenerator : Generator :=
   }
 
 #eval getModelRegistry
-#eval registerGenerator "gpt-5-mini-staging" stagingGenerator
+#eval registerGenerator "gpt-5-nano-staging" stagingGenerator
 #eval getModelRegistry
 
 
-set_option LeanCopilot.suggest_tactics.model "gpt-5-mini-staging" in
+set_option LeanCopilot.suggest_tactics.model "gpt-5-nano-staging" in
 example (a b c : Nat) : a + b + c = a + c + b := by
   try suggest_tactics
   try sorry

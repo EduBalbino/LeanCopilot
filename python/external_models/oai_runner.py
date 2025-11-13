@@ -53,7 +53,7 @@ class OpenAIRunner(Generator, Transformer):
             "max_suggestions": requested,
         }
         self.text_format = LeanSuggestionResponse
-        self.reasoning_config = {"effort": "medium"}
+        self.reasoning_config = {"effort": "low"}
         self.name = self.client_kwargs["model"]
 
     def generate(self, input: str, target_prefix: str = "") -> List[Tuple[str, float]]:
@@ -229,7 +229,7 @@ class OpenAIRunner(Generator, Transformer):
 
 if __name__ == "__main__":
     generation_kwargs = {
-        "model": "gpt-5-mini",
+        "model": "gpt-5-nano",
         "temperature": 0.0,
         "max_tokens": 1024,
         "top_p": 1.0,

@@ -1,7 +1,7 @@
 Agent Playbook
 ==============
 
-This file explains how contributors (human or automated) should use `progress/README.md` as the single source of truth for the GPT-5-mini refactor.
+This file explains how contributors (human or automated) should use `progress/README.md` as the single source of truth for the GPT-5-nano refactor.
 
 ## Using the Progress README
 
@@ -20,4 +20,4 @@ This file explains how contributors (human or automated) should use `progress/RE
 2. **Act**: Implement + test.
 3. **Document**: Update `progress/README.md` + commit references.
 
-Following this loop keeps the GPT-5-mini effort transparent and prevents duplicated work.
+Following this loop keeps the GPT-5-nano effort transparent and prevents duplicated work.

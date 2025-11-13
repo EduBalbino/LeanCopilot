@@ -1,7 +1,7 @@
-Python Server for GPT-5-mini
+Python Server for GPT-5-nano
 ============================
 
-This folder now contains a **single** FastAPI server that proxies requests from Lean Copilot to OpenAI's GPT-5-mini API. Each `/generate` call forwards one prompt and returns **exactly five** completions.
+This folder now contains a **single** FastAPI server that proxies requests from Lean Copilot to OpenAI's GPT-5-nano API. Each `/generate` call forwards one prompt and returns **exactly five** completions.
 
 ## Requirements
 
@@ -19,7 +19,7 @@ export OPENAI_API_KEY=sk-...
 uvicorn server:app --port 23337
 ```
 
-After the server is up running, you can go to `LeanCopilotTests/ModelAPIs.lean` to point Lean at this endpoint (or register another GPT-5-mini host/port).
+After the server is up running, you can go to `LeanCopilotTests/ModelAPIs.lean` to point Lean at this endpoint (or register another GPT-5-nano host/port).
 
 ## Testing & Monitoring
 
@@ -34,4 +34,4 @@ These examples exercise `suggest_tactics`, so any API error from the Python serv
 
 ## Contributions
 
-We currently scope the server to GPT-5-mini only; please keep contributions aligned with that goal. We use [`black`](https://pypi.org/project/black/) to format code in this folder.
+We currently scope the server to GPT-5-nano only; please keep contributions aligned with that goal. We use [`black`](https://pypi.org/project/black/) to format code in this folder.

@@ -20,6 +20,6 @@ def main (args : List String) : IO Unit := do
     | Except.ok _ => pure ()
 
   if urls.isEmpty then
-    println! "No builtin checkpoints are required for the GPT-5-mini-only release."
+    println! "No builtin checkpoints are required for the GPT-5-nano-only release."
   else
     println! "Done!"
