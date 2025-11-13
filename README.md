@@ -1,7 +1,7 @@
 Lean Copilot: LLMs as Copilots for Theorem Proving in Lean
 ==========================================================
 
-Lean Copilot allows large language models (LLMs) to be used natively in Lean for proof automation, e.g., suggesting tactics/premises and searching for proofs. You can use our built-in models from [LeanDojo](https://leandojo.org/) or bring your own models that run either locally (w/ or w/o GPUs) or on the cloud.
+Lean Copilot allows large language models (LLMs) to be used natively in Lean for proof automation, e.g., suggesting tactics and searching for proofs. This release focuses exclusively on a single external generator powered by **GPT-5-mini**. All requests go through the provided Python server and every proof search issues **at most five completions** per call.
 
 <https://github.com/lean-dojo/LeanCopilot/assets/114432581/ee0f56f8-849e-4099-9284-d8092cbd22a3>
 
@@ -13,11 +13,9 @@ Lean Copilot allows large language models (LLMs) to be used natively in Lean for
    1. [Getting Started with Lean Copilot](#getting-started-with-lean-copilot)
       1. [Tactic Suggestion](#tactic-suggestion)
       1. [Proof Search](#proof-search)
-      1. [Premise Selection](#premise-selection)
 1. [Advanced Usage](#advanced-usage)
    1. [Tactic APIs](#tactic-apis)
-   1. [Model APIs](#model-apis)
-   1. [Bring Your Own Model](#bring-your-own-model)
+   1. [Configuring the GPT-5-mini Server](#configuring-the-gpt-5-mini-server)
 1. [Caveats](#caveats)
 1. [Getting in Touch](#getting-in-touch)
 1. [Acknowledgements](#acknowledgements)
@@ -26,9 +24,8 @@ Lean Copilot allows large language models (LLMs) to be used natively in Lean for
 ## Requirements
 
 * Supported platforms: Linux, macOS, Windows and [Windows WSL](https://learn.microsoft.com/en-us/windows/wsl/install).
-* [Git LFS](https://git-lfs.com/).
-* Optional (recommended if you have a [CUDA-enabled GPU](https://developer.nvidia.com/cuda-gpus)): CUDA and [cuDNN](https://developer.nvidia.com/cudnn).
-* Required for building Lean Copilot itself (rather than a downstream package): CMake >= 3.7 and a C++17 compatible compiler.
+* Python 3.10+ with `fastapi`, `uvicorn`, `loguru`, and `openai`. (See `python/README.md`.)
+* An `OPENAI_API_KEY` that can access `gpt-5-mini`.
 
 ## Using Lean Copilot in Your Project
 
@@ -36,24 +33,7 @@ Lean Copilot allows large language models (LLMs) to be used natively in Lean for
 
 ### Adding Lean Copilot as a Dependency
 
-1. Add the package configuration option `moreLinkArgs := #["-L./.lake/packages/LeanCopilot/.lake/build/lib", "-lctranslate2"]` to lakefile.lean. For example,
-
-```lean
-package «my-package» {
-  moreLinkArgs := #[
-    "-L./.lake/packages/LeanCopilot/.lake/build/lib",
-    "-lctranslate2"
-  ]
-}
-```
-
-Alternatively, if your project uses lakefile.toml, it should include:
-
-```toml
-moreLinkArgs = ["-L./.lake/packages/LeanCopilot/.lake/build/lib", "-lctranslate2"]
-```
-
-2. Add the following line to lakefile.lean, including the quotation marks:
+1. Add the following line to lakefile.lean, including the quotation marks:
 
 ```lean
 require LeanCopilot from git "https://github.com/lean-dojo/LeanCopilot.git" @ "LEAN_COPILOT_VERSION"
@@ -68,18 +48,11 @@ git = "https://github.com/lean-dojo/LeanCopilot.git"
 rev = "LEAN_COPILOT_VERSION"
 ```
 
-3. If you are using native Windows, add `<path_to_your_project>/.lake/packages/LeanCopilot/.lake/build/lib` to your `Path` variable in Advanced System Settings > Environment Variables... > System variables. 
+2. Run `lake update LeanCopilot`.
 
-4. Run `lake update LeanCopilot`.
+3. Run `lake build`.
 
-5. Run `lake exe LeanCopilot/download` to download the built-in models from Hugging Face to `~/.cache/lean_copilot/`. *Alternatively*, you can download the models from Hugging Face manually from
-
-* [ct2-leandojo-lean4-tacgen-byt5-small](https://huggingface.co/kaiyuy/ct2-leandojo-lean4-tacgen-byt5-small)
-* [ct2-leandojo-lean4-retriever-byt5-small](https://huggingface.co/kaiyuy/ct2-leandojo-lean4-retriever-byt5-small)
-* [premise-embeddings-leandojo-lean4-retriever-byt5-small](https://huggingface.co/kaiyuy/premise-embeddings-leandojo-lean4-retriever-byt5-small)
-* [ct2-byt5-small](https://huggingface.co/kaiyuy/ct2-byt5-small)
-
-6. Run `lake build`.
+4. Start the Python server in `python/server.py` (see [Configuring the GPT-5-mini Server](#configuring-the-gpt-5-mini-server)) and ensure it has access to your `OPENAI_API_KEY`.
 
 [Here](https://github.com/yangky11/lean4-example/blob/LeanCopilot-demo) is an example of a Lean package depending on Lean Copilot. If you have problems building the project, our [Dockerfile](./Dockerfile), [build.sh](scripts/build.sh) or [build_example.sh](scripts/build_example.sh) may be helpful.
 
@@ -101,74 +74,57 @@ The tactic `search_proof` combines LLM-generated tactics with [aesop](https://gi
 
 <img width="824" alt="search_proof" src="https://github.com/lean-dojo/LeanCopilot/assets/114432581/26381fca-da4e-43d9-84b5-7e27b0612626">
 
-#### Premise Selection
-
-The `select_premises` tactic retrieves a list of potentially useful premises. Currently, it uses the retriever in [LeanDojo](https://leandojo.org/) to select premises from a fixed snapshot of Lean and [mathlib4](https://github.com/leanprover-community/mathlib4/tree/3ce43c18f614b76e161f911b75a3e1ef641620ff).
-
-![select_premises](https://github.com/lean-dojo/LeanCopilot/assets/114432581/2817663c-ba98-4a47-9ae9-5b8680b6265a)
-
 #### Running LLMs
 
-You can also run the inference of any LLMs in Lean, which can be used to build customized proof automation or other LLM-based applications (not limited to theorem proving). It's possible to run arbitrary models either locally or remotely (see [Bring Your Own Model](#bring-your-own-model)).
+LLM inference now goes through the bundled GPT-5-mini gateway. Use the scripts in [`python/`](./python) to point Lean Copilot at a different GPT-5-mini deployment if needed.
 
 <img width="1123" alt="run_llms" src="https://github.com/lean-dojo/LeanCopilot/assets/5431913/a4e5b84b-a797-4216-a416-2958448aeb07">
 
 ## Advanced Usage
 
-**This section is only for advanced users who would like to change the default behavior of `suggest_tactics`, `search_proof`, or `select_premises`, e.g., to use different models or hyperparameters.**
+**This section is only for advanced users who would like to change the default behavior of `suggest_tactics` or `search_proof`, e.g., to point them at a different GPT-5-mini endpoint.**
 
 ### Tactic APIs
 
-* Examples in [TacticSuggestion.lean](LeanCopilotTests/TacticSuggestion.lean) showcase how to configure `suggest_tactics`, e.g., to use different models or generate different numbers of tactics.
+* Examples in [TacticSuggestion.lean](LeanCopilotTests/TacticSuggestion.lean) showcase how to configure `suggest_tactics`, e.g., to switch between GPT-5-mini servers.
 * Examples in [ProofSearch.lean](LeanCopilotTests/ProofSearch.lean) showcase how to configure `search_proof` using options provided by [aesop](https://github.com/leanprover-community/aesop).
-* Examples in [PremiseSelection.lean](LeanCopilotTests/PremiseSelection.lean) showcase how to set the number of retrieved premises for `select_premises`.
 
-### Model APIs
+### Configuring the GPT-5-mini Server
 
-**Examples in [ModelAPIs.lean](LeanCopilotTests/ModelAPIs.lean) showcase how to run the inference of different models and configure their parameters (temperature, beam size, etc.).**
+**Examples in [ModelAPIs.lean](LeanCopilotTests/ModelAPIs.lean) showcase how to register additional GPT-5-mini endpoints or override the default host/port.**
 
-Lean Copilot supports two kinds of models: generators and encoders. Generators must implement the `TextToText` interface:
+Lean Copilot now treats `Generator` as an alias for [`ExternalGenerator`](LeanCopilot/Models/External.lean) and relies on the `TextToText` interface:
 
 ```lean
 class TextToText (τ : Type) where
-  generate (model : τ) (input : String) (targetPrefix : String) : IO $ Array (String × Float)
+  generate (model : τ) (input : String) (targetPrefix : String) :
+    IO $ Array (String × Float)
 ```
 
-* `input` is the input string
-* `targetPrefix` is used to constrain the generator's output. `""` means no constraint.
-* `generate` should return an array of `String × Float`. Each `String` is an output from the model, and `Float` is the corresponding score.
+Every request is forwarded to the Python server using the schema described in [external_model_api.yaml](./external_model_api.yaml). Our reference implementation lives in [`python/server.py`](./python/server.py), uses `OpenAIRunner`, and clamps `num_return_sequences` to **exactly five GPT-5-mini completions**.
 
-We provide three types of Generators:
+To run the server:
 
-* [`NativeGenerator`](LeanCopilot/Models/Native.lean) runs locally powered by [CTranslate2](https://github.com/OpenNMT/CTranslate2) and is linked to Lean using Foreign Function Interface (FFI).
-* [`ExternalGenerator`](LeanCopilot/Models/External.lean) is hosted either locally or remotely. See [Bring Your Own Model](#bring-your-own-model) for details.
-* [`GenericGenerator`](LeanCopilot/Models/Generic.lean) can be anything that implements the `generate` function in the `TextToText` typeclass.
-
-Encoders must implement `TextToVec`:
-
-```lean
-class TextToVec (τ : Type) where
-  encode : τ → String → IO FloatArray
+```bash
+cd python
+uvicorn server:app --port 23337
 ```
 
-* `input` is the input string
-* `encode` should return a vector embedding produced by the model.
+Make sure `OPENAI_API_KEY` is exported in the same shell. Adjust the host/port in Lean via `registerGenerator` if you proxy the server elsewhere.
 
-Similar to generators, we have `NativeEncoder`, `ExternalEncoder`, and `GenericEncoder`.
+### Testing & Monitoring the Server
 
-### Bring Your Own Model
+Our primary verification plan is to exercise the tactic suggestions in `LeanCopilotTests/TacticSuggestion.lean`.
 
-In principle, it is possible to run any model using Lean Copilot through `ExternalGenerator` or `ExternalEncoder` (examples in [ModelAPIs.lean](LeanCopilotTests/ModelAPIs.lean)). To use a model, you need to wrap it properly to expose the APIs in [external_model_api.yaml](./external_model_api.yaml). As an example, we provide a [Python API server](./python) and use it to run a few models.
+1. Start the Python server (or your systemd unit) so that the `/generate` endpoint is reachable.
+2. Run `lake build LeanCopilotTests` (or at least compile `LeanCopilotTests/TacticSuggestion.lean`). The Lean code will surface any API errors immediately.
+3. The Python server now enforces OpenAI Structured Outputs—any schema violation or refusal becomes an HTTP error. When that happens, inspect the server logs (e.g., `journalctl -u <your-service-name>`) to diagnose the failure.
+
+This tactic-focused test plan is sufficient for validating changes to the GPT-5-mini server.
 
 ## Caveats
 
-* `select_premises` always retrieves the original form of a premise. For example, `Nat.add_left_comm` is a result of the theorem below. In this case, `select_premises` retrieves `Nat.mul_left_comm` instead of `Nat.add_left_comm`.
-
-```lean
-@[to_additive]
-theorem mul_left_comm : ∀ a b c : G, a * (b * c) = b * (a * c)
-```
-
+* The Python server enforces **exactly five** completions per request to GPT-5-mini. Increase the budget by scaling out servers rather than changing `num_return_sequences`.
 * In some cases, `search_proof` produces an erroneous proof with error messages like `fail to show termination for ...`. A temporary workaround is changing the theorem's name before applying `search_proof`. You can change it back after `search_proof` completes.
 
 ## Getting in Touch

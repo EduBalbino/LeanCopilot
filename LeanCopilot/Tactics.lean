@@ -62,60 +62,9 @@ def suggestTactics (targetPrefix : String) : TacticM (Array (String × Float)) :
     return filteredSuggestions
 
 
-/--
-Information of a premise.
--/
-structure PremiseInfo where
-  name : String
-  path : String
-  code : String
-  score : Float
-
-
-/--
-Annotate a premise with its type, doc string, import module path, and definition code.
--/
-private def annotatePremise (pi : PremiseInfo) : MetaM String := do
-  let declName := pi.name.toName
-  try
-    let info ← getConstInfo declName
-    let premise_type ← Meta.ppExpr info.type
-    let some doc_str ← findDocString? (← getEnv) declName
-      | return s!"{pi.name} : {premise_type}\n"
-    return s!"{pi.name} : {premise_type}\n```doc\n{doc_str}\n```\n"
-  catch _ => return s!"{pi.name} needs to be imported from `{pi.path}`.\n```code\n{pi.code}\n```\n"
-
-
-/--
-Retrieve a list of premises given a query.
--/
-def retrieve (input : String) : TacticM (Array PremiseInfo) := do
-  if ¬ (← premiseEmbeddingsInitialized) ∧ ¬ (← initPremiseEmbeddings .auto) then
-    throwError "Cannot initialize premise embeddings"
-
-  if ¬ (← premiseDictionaryInitialized) ∧ ¬ (← initPremiseDictionary) then
-    throwError "Cannot initialize premise dictionary"
-
-  let k ← SelectPremises.getNumPremises
-  let query ← encode Builtin.encoder input
-
-  let rawPremiseInfo := FFI.retrieve query k.toUInt64
-  let premiseInfo : Array PremiseInfo := rawPremiseInfo.map fun (name, path, code, score) =>
-    { name := name, path := path, code := code, score := score }
-  return premiseInfo
-
-
-/--
-Retrieve a list of premises using the current pretty-printed tactic state as the query.
--/
-def selectPremises : TacticM (Array PremiseInfo) := do
-  retrieve (← getPpTacticState)
-
-
 syntax "pp_state" : tactic
 syntax "suggest_tactics" : tactic
 syntax "suggest_tactics" str : tactic
-syntax "select_premises" : tactic
 
 
 macro_rules
@@ -137,13 +86,5 @@ elab_rules : tactic
     let range : String.Range := { start := tac.getRange?.get!.start, stop := pfx.raw.getRange?.get!.stop }
     let ref := Syntax.ofRange range
     hint ref tactics (← SuggestTactics.checkTactics)
-
-  | `(tactic | select_premises) => do
-    let premisesWithInfoAndScores ← selectPremises
-    let rankedPremisesWithInfoAndScores := premisesWithInfoAndScores.qsort (·.score > ·.score)
-    let richPremises ← Meta.liftMetaM $ (rankedPremisesWithInfoAndScores.mapM annotatePremise)
-    let richPremisesExpand := richPremises.foldl (init := "") (· ++ · ++ "\n")
-    logInfo richPremisesExpand
-
 
 end LeanCopilot

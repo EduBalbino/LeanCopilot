@@ -16,7 +16,7 @@ def pre_process_input(model_name, input):
             + "```\nPlease predict a possible tactic to help me prove the theorem."
         )
         prompt = f"""<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"""
-    elif model_name == "gpt-3.5-turbo" or model_name == "gpt-4-turbo-preview":
+    elif model_name in ["gpt-3.5-turbo", "gpt-4-turbo-preview", "gpt-5-mini"]:
         prompt = (
             "Here is a theorem you need to prove in Lean:\n"
             + input
@@ -49,8 +49,10 @@ def post_process_output(model_name, output):
             .split("\n")[-2]
             .lstrip()
         )
-    elif model_name == "gpt-3.5-turbo" or model_name == "gpt-4-turbo-preview":
+    elif model_name in ["gpt-3.5-turbo", "gpt-4-turbo-preview"]:
         result = output.split("lean")[-1].split("```")[0].split("\n")[1]
+    elif model_name == "gpt-5-mini":
+        result = output.strip()
     elif "gemini" in model_name or "claude" in model_name:
         result = output.split("lean")[-1].split("```")[0].split("\n")[1]
     else:

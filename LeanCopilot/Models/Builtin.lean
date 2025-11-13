@@ -1,27 +1,16 @@
-import ModelCheckpointManager
-import LeanCopilot.Models.ByT5
+import LeanCopilot.Models.External
 
 set_option autoImplicit false
 
 namespace LeanCopilot.Builtin
 
-
-def generator : NativeGenerator := {
-  url := Url.parse! "https://huggingface.co/kaiyuy/ct2-leandojo-lean4-tacgen-byt5-small"
-  tokenizer := ByT5.tokenizer
-  params := {
-    numReturnSequences := 32
-  }
-}
-
-
-def encoder : NativeEncoder := {
-  url := Url.parse! "https://huggingface.co/kaiyuy/ct2-leandojo-lean4-retriever-byt5-small"
-  tokenizer := ByT5.tokenizer
-}
-
-
-def premisesUrl := Url.parse! "https://huggingface.co/kaiyuy/premise-embeddings-leandojo-lean4-retriever-byt5-small"
-
+/--
+Default external generator configuration used throughout Lean Copilot.
+This points to the Python server (localhost:23337) and requests GPT-5-mini.
+-/
+def generator : ExternalGenerator where
+  name := "gpt-5-mini"
+  host := "localhost"
+  port := 23337
 
 end LeanCopilot.Builtin

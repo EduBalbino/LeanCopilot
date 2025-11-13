@@ -53,22 +53,6 @@ def getGeneratorName : m String := do
 end SuggestTactics
 
 
-namespace SelectPremises
-
-
-register_option LeanCopilot.select_premises.k : Nat := {
-  defValue := 16
-}
-
-
-def getNumPremises : m Nat := do
-  match LeanCopilot.select_premises.k.get? (← getOptions) with
-  | some k => return k
-  | _ => return 16
-
-
-end SelectPremises
-
 end
 
 end LeanCopilot

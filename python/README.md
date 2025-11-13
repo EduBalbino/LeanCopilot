@@ -1,17 +1,16 @@
-Python Server for External Models
-=================================
+Python Server for GPT-5-mini
+============================
 
-This folder contains code that enables running some of the leading general-purpose or math-specific models. It is also fairly easy to adapt the existing code and run other external models you would like to bring.
+This folder now contains a **single** FastAPI server that proxies requests from Lean Copilot to OpenAI's GPT-5-mini API. Each `/generate` call forwards one prompt and returns **exactly five** completions.
 
 ## Requirements
 
-The setup steps are pretty simple. The script below is sufficient to run all external models already supported in this folder. If you only want to run a subset of them, you may not need all packages in the last step of pip installation.
-
 ```bash
-conda create --name lean-copilot python=3.10 python numpy
-conda activate lean-copilot
-pip install torch --index-url https://download.pytorch.org/whl/cu121  # Depending on whether you have CUDA and, if so, your CUDA version; see https://pytorch.org/.
-pip install fastapi uvicorn loguru transformers openai anthropic google.generativeai vllm
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install fastapi uvicorn loguru openai
+export OPENAI_API_KEY=sk-...
 ```
 
 ## Running the Server
@@ -20,10 +19,19 @@ pip install fastapi uvicorn loguru transformers openai anthropic google.generati
 uvicorn server:app --port 23337
 ```
 
-After the server is up running, you can go to `LeanCopilotTests/ModelAPIs.lean` to try your external models out!
+After the server is up running, you can go to `LeanCopilotTests/ModelAPIs.lean` to point Lean at this endpoint (or register another GPT-5-mini host/port).
+
+## Testing & Monitoring
+
+The recommended regression test is to build the tactic examples:
+
+```bash
+lake build LeanCopilotTests
+# or target LeanCopilotTests/TacticSuggestion.lean specifically
+```
+
+These examples exercise `suggest_tactics`, so any API error from the Python server shows up immediately in Lean. The server now enforces OpenAI Structured Outputs, meaning schema violations and safety refusals raise HTTP errors. If you run the server as a service, inspect it with `journalctl -u <service-name>` whenever a request fails.
 
 ## Contributions
 
-We welcome contributions. If you think it would beneficial to add some other external models, or if you would like to make other contributions regarding the external model support in Lean Copilot, please feel free to open a PR. The main entry point is this `python` folder as well as the `ModelAPIs.lean` file under `LeanCopilotTests`.
-
-We use [`black`](https://pypi.org/project/black/) to format code in this folder.
+We currently scope the server to GPT-5-mini only; please keep contributions aligned with that goal. We use [`black`](https://pypi.org/project/black/) to format code in this folder.

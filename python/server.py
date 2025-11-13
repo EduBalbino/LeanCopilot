@@ -1,66 +1,14 @@
-from typing import Optional
+import time
+from typing import Dict, List, Tuple, Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from models import *
-from external_models import *
+from models import Generator
+from external_models import OpenAIRunner
+from loguru import logger
 
-app = FastAPI()
 
-models = {
-    "gpt4": OpenAIRunner(
-        model="gpt-4-turbo-preview",
-        temperature=0.9,
-        max_tokens=1024,
-        top_p=0.9,
-        frequency_penalty=0,
-        presence_penalty=0,
-        num_return_sequences=16,
-        openai_timeout=45,
-    ),
-    "InternLM": VLLMTacticGenerator(
-        model="internlm/internlm2-math-plus-1_8b",
-        tensor_parallel_size=2,
-        temperature=0.6,
-        max_tokens=1024,
-        top_p=0.9,
-        length_penalty=0,
-        n=32,
-        do_sample=True,
-        output_scores=True,
-        output_logits=False,
-        return_dict_in_generate=True,
-        device="auto",
-    ),
-    "kimina": VLLMTacticGenerator(
-        model="AI-MO/Kimina-Prover-Preview-Distill-7B",
-        tensor_parallel_size=1,
-        temperature=0.6,
-        max_tokens=1024,
-        top_p=0.9,
-        length_penalty=0,
-        n=32,
-        do_sample=True,
-        output_scores=True,
-        output_logits=False,
-        return_dict_in_generate=True,
-        device="auto",
-    ),
-    "wellecks/llmstep-mathlib4-pythia2.8b": PythiaTacticGenerator(
-        num_return_sequences=32, max_length=1024, device="auto"
-    ),
-    "t5-small": EncoderDecoderTransformer(
-        "t5-small", num_return_sequences=3, max_length=1024
-    ),
-    "kaiyuy/leandojo-lean4-tacgen-byt5-small": EncoderDecoderTransformer(
-        "kaiyuy/leandojo-lean4-tacgen-byt5-small",
-        num_return_sequences=32,
-        max_length=1024,
-    ),
-    "kaiyuy/leandojo-lean4-retriever-byt5-small": EncoderOnlyTransformer(
-        "kaiyuy/leandojo-lean4-retriever-byt5-small"
-    ),
-}
+GPT5_MINI_MODEL_NAME = "gpt-5-mini"
 
 
 class GeneratorRequest(BaseModel):
@@ -78,27 +26,43 @@ class GeneratorResponse(BaseModel):
     outputs: List[Generation]
 
 
-class EncoderRequest(BaseModel):
-    name: str
-    input: str
+app = FastAPI()
 
 
-class EncoderResponse(BaseModel):
-    outputs: List[float]
+generators: Dict[str, Generator] = {
+    GPT5_MINI_MODEL_NAME: OpenAIRunner(
+        model=GPT5_MINI_MODEL_NAME,
+        temperature=0.3,
+        max_tokens=1024,
+        top_p=0.9,
+        frequency_penalty=0,
+        presence_penalty=0,
+        num_return_sequences=5,
+        openai_timeout=45,
+    ),
+}
 
 
 @app.post("/generate")
 async def generate(req: GeneratorRequest) -> GeneratorResponse:
-    model = models[req.name]
+    start = time.perf_counter()
+    if req.name not in generators:
+        logger.error("Unknown generator requested: {}", req.name)
+        raise RuntimeError(
+            f"Unknown generator '{req.name}'. Only {GPT5_MINI_MODEL_NAME} is supported."
+        )
+    model = generators[req.name]
     target_prefix = req.prefix if req.prefix is not None else ""
-    outputs = model.generate(req.input, target_prefix)
+    outputs: List[Tuple[str, float]] = model.generate(req.input, target_prefix)
+    duration = time.perf_counter() - start
+    logger.info(
+        "generate name={} chars={} prefix={} suggestions={} duration={:.2f}s",
+        req.name,
+        len(req.input),
+        len(target_prefix),
+        len(outputs),
+        duration,
+    )
     return GeneratorResponse(
         outputs=[Generation(output=out[0], score=out[1]) for out in outputs]
     )
-
-
-@app.post("/encode")
-async def encode(req: EncoderRequest) -> EncoderResponse:
-    model = models[req.name]
-    feature = model.encode(req.input)
-    return EncoderResponse(outputs=feature.tolist())

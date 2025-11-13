@@ -4,12 +4,7 @@ import ModelCheckpointManager.Download
 open LeanCopilot
 
 
-def builtinModelUrls : List String := [
-  "https://huggingface.co/kaiyuy/ct2-leandojo-lean4-tacgen-byt5-small",
-  "https://huggingface.co/kaiyuy/ct2-leandojo-lean4-retriever-byt5-small",
-  "https://huggingface.co/kaiyuy/premise-embeddings-leandojo-lean4-retriever-byt5-small",
-  "https://huggingface.co/kaiyuy/ct2-byt5-small"
-]
+def builtinModelUrls : List String := []
 
 
 def main (args : List String) : IO Unit := do
@@ -24,4 +19,7 @@ def main (args : List String) : IO Unit := do
     | Except.error e => throw e
     | Except.ok _ => pure ()
 
-  println! "Done!"
+  if urls.isEmpty then
+    println! "No builtin checkpoints are required for the GPT-5-mini-only release."
+  else
+    println! "Done!"
