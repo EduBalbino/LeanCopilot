@@ -53,3 +53,13 @@ set_option LeanCopilot.suggest_tactics.model "gpt-5-nano-staging" in
 example (a b c : Nat) : a + b + c = a + c + b := by
   try suggest_tactics
   try sorry
+
+
+/-
+The default generator can also be addressed via the OpenAI-prefixed name.
+-/
+
+set_option LeanCopilot.suggest_tactics.model "openai/gpt-5-nano" in
+example (a b c : Nat) : a + b + c = a + c + b := by
+  try suggest_tactics
+  try sorry
