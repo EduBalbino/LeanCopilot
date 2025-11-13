@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List, Tuple, Any, Dict, Optional
 import os
 import json
+import hashlib
 from pydantic import BaseModel, ConfigDict, Field
 from loguru import logger
 from openai import OpenAI
@@ -12,6 +13,7 @@ from .external_parser import *
 
 MAX_COMPLETIONS = 5
 MAX_ATTEMPTS = 3
+SUGGESTIONS_PER_REQUEST = 1
 
 SCHEMA_INSTRUCTIONS_TEMPLATE = """
 You are a Lean 4 assistant. Think through the goal, then respond ONLY with strict JSON:
@@ -52,30 +54,76 @@ class OpenAIRunner(Generator, Transformer):
             "timeout": args["openai_timeout"],
             "max_suggestions": requested,
         }
+        self.max_suggestions = requested
+        self.requests_per_prompt = max(1, requested)
         self.text_format = LeanSuggestionResponse
         self.reasoning_config = {"effort": "low"}
         self.name = self.client_kwargs["model"]
 
     def generate(self, input: str, target_prefix: str = "") -> List[Tuple[str, float]]:
-        user_prompt = pre_process_input(self.name, input + target_prefix)
-        system_prompt = SCHEMA_INSTRUCTIONS_TEMPLATE.replace(
-            "{limit}", str(self.client_kwargs["max_suggestions"])
-        )
+        user_prompt = pre_process_input(self.name, input, target_prefix)
+        prompt_cache_key = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
         max_tokens = self.client_kwargs["max_output_tokens"]
+        all_suggestions: List[Tuple[str, float]] = []
         last_error: Optional[Exception] = None
+
+        for batch in range(self.requests_per_prompt):
+            remaining = self.max_suggestions - len(all_suggestions)
+            if remaining <= 0:
+                break
+            limit = min(SUGGESTIONS_PER_REQUEST, remaining)
+            try:
+                batch_suggestions = self._generate_batch(
+                    user_prompt=user_prompt,
+                    prompt_cache_key=prompt_cache_key,
+                    max_tokens=max_tokens,
+                    limit=limit,
+                )
+                all_suggestions.extend(batch_suggestions)
+            except RuntimeError as err:
+                last_error = err
+                logger.warning(
+                    "Batch {}/{} failed: {}",
+                    batch + 1,
+                    self.requests_per_prompt,
+                    err,
+                )
+
+        deduped = choices_dedup(all_suggestions)
+        if deduped:
+            return deduped[: self.max_suggestions]
+
+        raise last_error or RuntimeError(
+            "Model response did not contain structured tactics."
+        )
+
+    def _generate_batch(
+        self,
+        *,
+        user_prompt: str,
+        prompt_cache_key: str,
+        max_tokens: int,
+        limit: int,
+    ) -> List[Tuple[str, float]]:
+        system_prompt = SCHEMA_INSTRUCTIONS_TEMPLATE.replace("{limit}", str(limit))
+        max_output_tokens = max_tokens
+        last_error: Optional[Exception] = None
+
         for attempt in range(1, MAX_ATTEMPTS + 1):
             response = OpenAIRunner.client.responses.parse(
                 model=self.client_kwargs["model"],
                 instructions=system_prompt,
                 input=[{"role": "user", "content": user_prompt}],
                 text_format=self.text_format,
-                max_output_tokens=max_tokens,
+                max_output_tokens=max_output_tokens,
                 reasoning=self.reasoning_config,
+                prompt_cache_key=prompt_cache_key,
+                timeout=self.client_kwargs["timeout"],
             )
 
             if self._is_incomplete_due_to_tokens(response):
-                new_tokens = max(128, max_tokens // 2)
-                if new_tokens == max_tokens:
+                new_tokens = max(128, max_output_tokens // 2)
+                if new_tokens == max_output_tokens:
                     last_error = RuntimeError(
                         "Model stopped early due to max_output_tokens."
                     )
@@ -84,12 +132,11 @@ class OpenAIRunner(Generator, Transformer):
                     "Structured output incomplete (max tokens). Retrying with {} tokens.",
                     new_tokens,
                 )
-                max_tokens = new_tokens
+                max_output_tokens = new_tokens
                 continue
 
             try:
-                parsed = self._parse_choices(response)
-                return choices_dedup(parsed)
+                return self._parse_choices(response, limit=limit)
             except RuntimeError as err:
                 last_error = err
                 logger.warning(
@@ -103,14 +150,15 @@ class OpenAIRunner(Generator, Transformer):
             "Model response did not contain structured tactics."
         )
 
-    def _parse_choices(self, response: Any) -> List[Tuple[str, float]]:
+    def _parse_choices(self, response: Any, limit: Optional[int] = None) -> List[Tuple[str, float]]:
         self._raise_on_refusal(response)
         payload = response.output_parsed
         if payload is None:
             payload = self._fallback_parse(response)
 
         parsed: List[Tuple[str, float]] = []
-        for suggestion in payload.suggestions[: self.client_kwargs["max_suggestions"]]:
+        max_items = limit if limit is not None else self.client_kwargs["max_suggestions"]
+        for suggestion in payload.suggestions[:max_items]:
             tactic = suggestion.tactic.strip()
             if not tactic:
                 continue

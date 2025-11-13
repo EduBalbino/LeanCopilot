@@ -8,25 +8,36 @@ def get_cuda_if_available():
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def pre_process_input(model_name, input):
-    if model_name == "internlm/internlm2-math-plus-1_8b" or model_name == "AI-MO/Kimina-Prover-Preview-Distill-7B":    
+def pre_process_input(model_name, state: str, target_prefix: str = ""):
+    state_block = state.strip()
+    prefix_hint = (
+        f"\nOnly return tactics that start with `{target_prefix}`."
+        if target_prefix
+        else ""
+    )
+
+    if model_name in [
+        "internlm/internlm2-math-plus-1_8b",
+        "AI-MO/Kimina-Prover-Preview-Distill-7B",
+    ]:
         prompt = (
             "My LEAN 4 state is:\n```lean\n"
-            + input
-            + "```\nPlease predict a possible tactic to help me prove the theorem."
+            + state_block
+            + "\n```\nPlease predict a possible tactic to help me prove the theorem."
+            + prefix_hint
         )
         prompt = f"""<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"""
-    elif model_name in ["gpt-3.5-turbo", "gpt-4-turbo-preview", "gpt-5-nano"]:
+    elif (
+        model_name in ["gpt-3.5-turbo", "gpt-4-turbo-preview", "gpt-5-nano"]
+        or "gemini" in model_name
+        or "claude" in model_name
+    ):
         prompt = (
-            "Here is a theorem you need to prove in Lean:\n"
-            + input
-            + "\nNow you should suggest one line tactic in lean code:"
-        )
-    elif "gemini" in model_name or "claude" in model_name:
-        prompt = (
-            "Here is a theorem you need to prove in Lean:\n"
-            + input
-            + "\nNow you should suggest one line tactic in lean code:"
+            "You are given the current Lean 4 goal and context:\n```lean\n"
+            + state_block
+            + "\n```\nSuggest a single Lean tactic that can make progress."
+            + prefix_hint
+            + "\nRespond with the tactic only (no leading `by`)."
         )
     else:
         raise NotImplementedError(f"External model '{model_name}' not supported")
@@ -53,6 +64,8 @@ def post_process_output(model_name, output):
         result = output.split("lean")[-1].split("```")[0].split("\n")[1]
     elif model_name == "gpt-5-nano":
         result = output.strip()
+        if result.startswith("by") and (len(result) == 2 or result[2].isspace()):
+            result = result[2:].lstrip()
     elif "gemini" in model_name or "claude" in model_name:
         result = output.split("lean")[-1].split("```")[0].split("\n")[1]
     else:

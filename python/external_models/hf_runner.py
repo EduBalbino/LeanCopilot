@@ -36,11 +36,7 @@ class HFTacticGenerator(Generator, Transformer):
         }
 
     def generate(self, input: str, target_prefix: str = "") -> List[Tuple[str, float]]:
-        prompt = input + target_prefix
-        '''prompt= 'Here is a theorom you need to prove in Lean:\n'+prompt+'\nNow you should suggest one line tactic in lean code:'
-        prompt = f"""<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"""
-        '''
-        prompt = pre_process_input(self.name, prompt)
+        prompt = pre_process_input(self.name, input, target_prefix)
 
         self.model = self.model.eval()
 

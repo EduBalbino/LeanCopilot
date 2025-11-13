@@ -76,7 +76,7 @@ The tactic `search_proof` combines LLM-generated tactics with [aesop](https://gi
 
 #### Running LLMs
 
-LLM inference now goes through the bundled GPT-5-nano gateway. Use the scripts in [`python/`](./python) to point Lean Copilot at a different GPT-5-nano deployment if needed.
+LLM inference now goes through the bundled GPT-5-nano gateway. Use the scripts in [`python/`](./python) to point Lean Copilot at a different GPT-5-nano deployment if needed. Every Lean request now yields up to **five sequential Responses API calls** that share a `prompt_cache_key`, so OpenAI serves cached prompt context while still producing diverse completions.
 
 <img width="1123" alt="run_llms" src="https://github.com/lean-dojo/LeanCopilot/assets/5431913/a4e5b84b-a797-4216-a416-2958448aeb07">
 
@@ -108,6 +108,13 @@ To run the server:
 ```bash
 cd python
 uvicorn server:app --port 23337
+```
+
+If you use the provided systemd unit, restart it whenever you change any file under `python/`:
+
+```bash
+systemctl --user restart gpt5-server.service
+journalctl --user -u gpt5-server.service -n 50
 ```
 
 Make sure `OPENAI_API_KEY` is exported in the same shell. Adjust the host/port in Lean via `registerGenerator` if you proxy the server elsewhere.

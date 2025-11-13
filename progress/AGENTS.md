@@ -21,3 +21,14 @@ This file explains how contributors (human or automated) should use `progress/RE
 3. **Document**: Update `progress/README.md` + commit references.
 
 Following this loop keeps the GPT-5-nano effort transparent and prevents duplicated work.
+
+## FastAPI Server Hygiene
+
+* Whenever you touch anything under `python/`, restart the GPT-5 server so Lean picks up the new behavior:
+
+  ```bash
+  systemctl --user restart gpt5-server.service
+  journalctl --user -u gpt5-server.service -n 50
+  ```
+
+* Treat `/generate` contract changes like API migrations—note them in `progress/README.md` and the main `README`.

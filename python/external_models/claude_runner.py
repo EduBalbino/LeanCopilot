@@ -21,7 +21,7 @@ class ClaudeRunner(Generator, Transformer):
         self.name = self.client_kwargs["model"]
 
     def generate(self, input: str, target_prefix: str = "") -> List[Tuple[str, float]]:
-        prompt = pre_process_input(self.name, input + target_prefix)
+        prompt = pre_process_input(self.name, input, target_prefix)
 
         response = self.client.completions.create(
             prompt=prompt,

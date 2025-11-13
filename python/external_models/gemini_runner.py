@@ -47,7 +47,7 @@ class GeminiRunner(Generator, Transformer):
         )
 
     def generate(self, input: str, target_prefix: str = "") -> List[Tuple[str, float]]:
-        prompt = pre_process_input(self.name, input + target_prefix)
+        prompt = pre_process_input(self.name, input, target_prefix)
 
         response = self.client.generate_content(
             prompt,
