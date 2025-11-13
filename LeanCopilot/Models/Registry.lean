@@ -21,7 +21,8 @@ instance : Coe ExternalGenerator Generator := ⟨Generator.external⟩
 
 instance : TextToText Generator where
   generate
-  | .external model => TextToText.generate model input targetPrefix
+  | .external model, input, targetPrefix =>
+      TextToText.generate model input targetPrefix
 
 
 structure ModelRegistry where
@@ -56,12 +57,11 @@ def getModelRegistry : IO ModelRegistry :=
 
 private def normalizeGeneratorName (name : String) : List String :=
   let openAiPrefix := "openai/"
-  let mut candidates : List String := []
-  if name.startsWith openAiPrefix then
-    let alias := name.drop openAiPrefix.length
-    if alias ≠ "" then
-      candidates := alias :: candidates
-  candidates
+  let aliasName := name.drop openAiPrefix.length
+  if name.startsWith openAiPrefix && ! aliasName.isEmpty then
+    [aliasName]
+  else
+    []
 
 
 def getGenerator (name : String) : Lean.CoreM Generator := do
@@ -69,10 +69,9 @@ def getGenerator (name : String) : Lean.CoreM Generator := do
   match mr.generators[name]? with
   | some model => return model
   | none =>
-      for alias in normalizeGeneratorName name do
-        if let some model := mr.generators[alias]? then
-          return model
-      throwError s!"unknown generator: {name}"
+      match (normalizeGeneratorName name).findSome? (fun aliasName => mr.generators[aliasName]?) with
+      | some model => return model
+      | none => throwError s!"unknown generator: {name}"
 
 
 def registerGenerator (name : String) (model : Generator) : IO Unit := do

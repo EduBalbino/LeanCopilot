@@ -7,10 +7,10 @@ Local alias for the default GPT-5-nano generator served by `python/server.py`.
 Update `host`/`port` if you run the server elsewhere.
 -/
 def gpt5NanoLocal : Generator :=
-  {Builtin.generator with
+  ({Builtin.generator with
     host := "localhost"
     port := 23337
-  }
+  } : ExternalGenerator)
 
 
 /-

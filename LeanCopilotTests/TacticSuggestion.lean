@@ -39,10 +39,10 @@ example (a b c : Nat) : a + b + c = a + c + b := by
 -/
 
 def stagingGenerator : Generator :=
-  {Builtin.generator with
+  ({Builtin.generator with
     host := "127.0.0.1"
     port := 24444
-  }
+  } : ExternalGenerator)
 
 #eval getModelRegistry
 #eval registerGenerator "gpt-5-nano-staging" stagingGenerator
